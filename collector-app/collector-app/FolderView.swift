@@ -8,6 +8,7 @@ struct VariableBlurView: UIViewRepresentable {
 
     class BlurView: UIVisualEffectView {
         var animator: UIViewPropertyAnimator?
+        private var lastIntensity: Double = -1
 
         init() {
             super.init(effect: nil)
@@ -18,6 +19,8 @@ struct VariableBlurView: UIViewRepresentable {
         func setIntensity(_ value: Double) {
             animator?.stopAnimation(true)
             effect = nil
+            lastIntensity = value
+
             let anim = UIViewPropertyAnimator(duration: 1, curve: .linear) { [weak self] in
                 self?.effect = UIBlurEffect(style: .systemUltraThinMaterial)
             }
@@ -85,31 +88,28 @@ struct FolderView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            ZStack {
-                // Backdrop blur ~5px (intensity ≈ 5/25 of systemUltraThinMaterial)
-                VariableBlurView(intensity: 0.2)
-                    .clipShape(FolderShape())
-
-                // Color fill: #6A6A6A at 10%
-                FolderShape()
-                    .fill(Color(red: 106/255, green: 106/255, blue: 106/255, opacity: 0.1))
-
-                // Gradient stroke: #c9c9c9 @ 50% → transparent
-                // Direction from Figma gradientTransform (bottom-left → top-right)
-                FolderShape()
-                    .stroke(
-                        LinearGradient(
-                            stops: [
-                                .init(color: Color(red: 201/255, green: 201/255, blue: 201/255, opacity: 0.5), location: 0),
-                                .init(color: Color(red: 201/255, green: 201/255, blue: 201/255, opacity: 0), location: 1)
-                            ],
-                            startPoint: UnitPoint(x: -0.028, y: 0.549),
-                            endPoint: UnitPoint(x: 0.576, y: 0.082)
-                        ),
-                        lineWidth: 1
-                    )
-            }
+            FolderShape()
+                .fill(Color(red: 106/255, green: 106/255, blue: 106/255, opacity: 0.1))
+                .background(
+                    VariableBlurView(intensity: 0.2)
+                        .clipShape(FolderShape())
+                )
+                .overlay(
+                    FolderShape()
+                        .stroke(
+                            LinearGradient(
+                                stops: [
+                                    .init(color: Color(red: 201/255, green: 201/255, blue: 201/255, opacity: 0.5), location: 0),
+                                    .init(color: Color(red: 201/255, green: 201/255, blue: 201/255, opacity: 0), location: 1)
+                                ],
+                                startPoint: UnitPoint(x: -0.028, y: 0.549),
+                                endPoint: UnitPoint(x: 0.576, y: 0.082)
+                            ),
+                            lineWidth: 1
+                        )
+                )
             .frame(width: 160, height: 130)
+            .id(name)
 
             Text(name)
                 .font(.system(size: 14, design: .monospaced))

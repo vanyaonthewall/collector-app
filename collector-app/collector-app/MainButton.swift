@@ -161,6 +161,7 @@ private struct IcChevron: View {
 
 struct MainButton: View {
     let action: () -> Void
+    var padding: CGFloat = 24
 
     @State private var isPressed = false
 
@@ -168,7 +169,7 @@ struct MainButton: View {
         Button(action: action) {
             IcCamera()
                 .frame(width: 40, height: 40)
-                .padding(24)
+                .padding(padding)
                 .background(
                     ZStack {
                         VariableBlurView(intensity: 0.08).clipShape(Circle())

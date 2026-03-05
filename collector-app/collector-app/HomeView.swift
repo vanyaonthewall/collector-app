@@ -44,13 +44,22 @@ struct HomeView: View {
 
     @State private var selectedFolder: Folder? = nil
     @State private var showDetail = false
-    @State private var detailScale: CGFloat = 0.1
+    @State private var detailScale: CGFloat = 0.0
     @State private var detailOpacity: Double = 0.0
     @State private var detailBlur: CGFloat = 20
     @State private var tappedAnchor: UnitPoint = .center
     @State private var folderFrames: [Int: CGRect] = [:]
 
     private var isScrolled: Bool { scrollOffset > 20 }
+
+    private func gridColumns(for width: CGFloat) -> [GridItem] {
+        let itemWidth: CGFloat = 160
+        let paddingHorizontal: CGFloat = 24
+        let spacing: CGFloat = 24
+        let availableWidth = width - paddingHorizontal * 2
+        let columns = max(Int((availableWidth + spacing) / (itemWidth + spacing)), 1)
+        return Array(repeating: GridItem(.flexible()), count: columns)
+    }
 
     private func folderRotation(_ name: String) -> Double {
         let sum = name.utf8.reduce(0) { Int($0) &+ Int($1) }
@@ -70,49 +79,62 @@ struct HomeView: View {
         detailBlur = 20
         selectedFolder = folder
         showDetail = true
-        withAnimation(.easeOut(duration: 0.2)) { detailBlur = 0 }
-        withAnimation(.easeOut(duration: 0.4)) {
+
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
             detailScale = 1.0
             detailOpacity = 1.0
+            detailBlur = 0
         }
     }
 
     private func closeFolder() {
         withAnimation(.easeIn(duration: 0.15)) { detailBlur = 20 }
         withAnimation(.easeIn(duration: 0.25)) {
-            detailScale = 0.1
+            detailScale = 0.0
             detailOpacity = 0.0
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
             showDetail = false
             selectedFolder = nil
-            detailScale = 0.1
+            detailScale = 0.0
             detailOpacity = 0.0
             detailBlur = 20
         }
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Color.white.ignoresSafeArea()
-                .overlay(DotPattern().ignoresSafeArea())
+        GeometryReader { geo in
+            ZStack(alignment: .bottom) {
+                Color.white.ignoresSafeArea()
+                    .overlay(DotPattern().ignoresSafeArea())
 
-            ScrollViewReader { proxy in
-            ScrollView {
-                LazyVGrid(
-                    columns: [GridItem(.flexible()), GridItem(.flexible())],
-                    spacing: 24
-                ) {
+                ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVGrid(
+                        columns: gridColumns(for: geo.size.width),
+                        spacing: 24
+                    ) {
                     ForEach(folders) { folder in
                         let isNew = folder.name == newlyAddedFolderName && newFolderIsAnimating
                         Button { openFolder(folder) } label: {
                             FolderView(name: folder.name)
                         }
                         .buttonStyle(.plain)
-                        .scaleEffect(isNew ? 1.1 : 1.0)
-                        .blur(radius: isNew ? 6 : 0)
+                        .scaleEffect(isNew ? 1.2 : 1.0)
                         .rotationEffect(.degrees(folderRotation(folder.name) + (isNew ? 10 : 0)))
                         .animation(.spring(response: 0.5, dampingFraction: 0.65), value: isNew)
+                        .onAppear {
+                            guard folder.name == newlyAddedFolderName, newFolderIsAnimating else { return }
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                withAnimation(.spring(response: 0.5, dampingFraction: 0.65)) {
+                                    newFolderIsAnimating = false
+                                }
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+                                newlyAddedFolderName = nil
+                            }
+                        }
                         .background(
                             GeometryReader { geo in
                                 Color.clear.preference(
@@ -121,6 +143,7 @@ struct HomeView: View {
                                 )
                             }
                         )
+                        .id(folder.id)
                     }
                 }
                 .padding(.horizontal, 24)
@@ -172,9 +195,34 @@ struct HomeView: View {
 
             } // ScrollViewReader
 
-            MainButton(action: {})
-                .padding(.bottom, 30)
-
+                MainButton(action: {})
+                    .padding(.bottom, 30)
+                    .zIndex(2)
+                    .offset(y: showDetail ? 150 : 0)
+                    .opacity(showDetail ? 0 : 1)
+                    .disabled(showDetail)
+                    .animation(.easeIn(duration: 0.2), value: showDetail)
+            }
+            .onPreferenceChange(FolderFrameKey.self) { frames in
+                folderFrames = frames
+            }
+            .ignoresSafeArea(.keyboard)
+            .alert("New Collection", isPresented: $isCreatingFolder) {
+            TextField("Name", text: $newFolderName)
+            Button("Create") {
+                let trimmed = newFolderName.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.isEmpty else { return }
+                newlyAddedFolderName = trimmed
+                newFolderIsAnimating = true
+                modelContext.insert(Folder(name: trimmed))
+                newFolderName = ""
+            }
+                Button("Cancel", role: .cancel) {
+                    newFolderName = ""
+                }
+            }
+        }
+        .overlay(alignment: .topLeading) {
             if showDetail, let folder = selectedFolder {
                 FolderDetailView(folder: folder, onDismiss: closeFolder)
                     .frame(
@@ -185,34 +233,6 @@ struct HomeView: View {
                     .scaleEffect(detailScale, anchor: tappedAnchor)
                     .opacity(detailOpacity)
                     .blur(radius: detailBlur)
-                    .zIndex(1)
-            }
-        }
-        .onPreferenceChange(FolderFrameKey.self) { frames in
-            folderFrames = frames
-        }
-        .ignoresSafeArea(.keyboard)
-        .alert("New Collection", isPresented: $isCreatingFolder) {
-            TextField("Name", text: $newFolderName)
-            Button("Create") {
-                let trimmed = newFolderName.trimmingCharacters(in: .whitespaces)
-                guard !trimmed.isEmpty else { return }
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                newlyAddedFolderName = trimmed
-                newFolderIsAnimating = true
-                modelContext.insert(Folder(name: trimmed))
-                newFolderName = ""
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.65)) {
-                        newFolderIsAnimating = false
-                    }
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
-                    newlyAddedFolderName = nil
-                }
-            }
-            Button("Cancel", role: .cancel) {
-                newFolderName = ""
             }
         }
     }
