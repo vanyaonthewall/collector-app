@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_figma_figma__get_design_context"
+    ],
+    "additionalDirectories": [
+      "/Users/vanyagorbachev/Desktop/collector-app/collector-app",
+      "/Users/vanyagorbachev/Desktop/collector-app/collector-app/collector-app/Assets.xcassets/ic-camera.imageset"
+    ]
+  }
+}
