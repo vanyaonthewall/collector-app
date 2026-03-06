@@ -88,6 +88,7 @@ struct HomeView: View {
     @State private var bouncingFolderName: String? = nil
     @State private var navigationPath = NavigationPath()
     @State private var tappingFolderID: PersistentIdentifier? = nil
+    @State private var foldersAnimatedIn = false
 
     private var isScrolled: Bool { scrollOffset > 20 }
 
@@ -158,6 +159,8 @@ struct HomeView: View {
                 .padding(.horizontal, 24)
                 .padding(.top, 20)
                 .padding(.bottom, 120)
+                .offset(y: foldersAnimatedIn ? 0 : 70)
+                .opacity(foldersAnimatedIn ? 1 : 0)
             }
             .onScrollGeometryChange(for: CGFloat.self) { geo in
                 geo.contentOffset.y
@@ -209,6 +212,14 @@ struct HomeView: View {
                     .zIndex(2)
             }
             .ignoresSafeArea(.keyboard)
+            .onAppear {
+                let gifDuration = GIFView.loadGIF(named: "glass")?.duration ?? 2.0
+                DispatchQueue.main.asyncAfter(deadline: .now() + gifDuration + 0.1) {
+                    withAnimation(.spring(response: 0.55, dampingFraction: 0.82)) {
+                        foldersAnimatedIn = true
+                    }
+                }
+            }
             .alert("New Collection", isPresented: $isCreatingFolder) {
             TextField("Name", text: $newFolderName)
             Button("Create") {

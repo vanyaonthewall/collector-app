@@ -50,6 +50,7 @@ struct PhotoReviewView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Folder.createdAt) var folders: [Folder]
+    @Query var allItems: [CollectionItem]
 
     @State private var processedImage: UIImage? = nil
     @State private var isProcessing = true
@@ -83,7 +84,7 @@ struct PhotoReviewView: View {
             VStack(spacing: 0) {
                 // Шапка
                 ZStack {
-                    Text("Новый предмет")
+                    Text("New Item")
                         .font(.system(size: 17, weight: .regular, design: .monospaced))
                         .kerning(-1)
                         .foregroundStyle(.black)
@@ -97,27 +98,8 @@ struct PhotoReviewView: View {
                 .padding(.top, topInset + 8)
                 .padding(.bottom, 16)
 
-                // Зона изображения — offset и scale применяются к ZStack целиком
+                // Зона изображения
                 ZStack {
-                    if let error = processingError {
-                        Text(error)
-                            .font(.system(size: 14, design: .monospaced))
-                            .foregroundStyle(Color(white: 0.35))
-                            .transition(.opacity)
-                            .animation(.easeInOut(duration: 0.2), value: processingError)
-                    } else if isProcessing {
-                        VStack(spacing: 10) {
-                            ProgressView()
-                                .scaleEffect(1.3)
-                                .tint(Color(white: 0.35))
-                            Text("Удаляем фон")
-                                .font(.system(size: 13, design: .monospaced))
-                                .foregroundStyle(Color(white: 0.35))
-                        }
-                        .transition(.opacity)
-                        .animation(.easeInOut(duration: 0.2), value: isProcessing)
-                    }
-
                     if let img = processedImage {
                         Image(uiImage: img)
                             .resizable()
@@ -128,11 +110,6 @@ struct PhotoReviewView: View {
                 .padding(.horizontal, 24)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .allowsHitTesting(false)
-
-                // Заглушка высоты нижней панели — удерживает лоадер на месте
-                if isProcessing {
-                    Color.clear.frame(height: 36 + folderAreaH + 36 + 64 + bottomInset + 16)
-                }
 
                 // Папки — появляются справа
                 if !isProcessing {
@@ -189,7 +166,7 @@ struct PhotoReviewView: View {
                 // Кнопка — появляется снизу
                 if !isProcessing {
                     Button { triggerSave() } label: {
-                        Text("Поместить")
+                        Text("Save")
                             .font(.system(size: 16, design: .monospaced))
                             .foregroundStyle(canSave ? .white : Color(white: 0.5))
                             .frame(maxWidth: .infinity)
@@ -215,6 +192,27 @@ struct PhotoReviewView: View {
                         removal: .opacity
                     ))
                 }
+            }
+        }
+        .overlay {
+            if processingError != nil {
+                VStack(spacing: 16) {
+                    GIFView(name: "sock")
+                        .frame(width: 150, height: 150)
+                    Text("Item not found")
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundStyle(Color(white: 0.35))
+                }
+                .transition(.opacity)
+            } else if isProcessing {
+                VStack(spacing: 16) {
+                    GIFView(name: "knee")
+                        .frame(width: 150, height: 150)
+                    Text("Removing background")
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundStyle(Color(white: 0.35))
+                }
+                .transition(.opacity)
             }
         }
         .ignoresSafeArea()
@@ -280,9 +278,8 @@ struct PhotoReviewView: View {
             return
         }
         print("💾 Сохраняем item в папку '\(folder.name)'")
-        let count = folder.items.count
         let item = CollectionItem(folder: folder)
-        item.name = "Предмет \(count + 1)"
+        item.name = "Item #\(allItems.count + 1)"
         do {
             try ImageStorage.save(img, id: item.id)
             print("📁 Image сохранён: \(item.id)")

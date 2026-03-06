@@ -80,7 +80,7 @@ struct FolderDetailView: View {
                 .overlay(DotPattern().ignoresSafeArea())
 
             if folder.items.isEmpty {
-                Text("пока ничего нет")
+                Text("nothing here yet")
                     .font(.system(size: 13, design: .monospaced))
                     .foregroundStyle(Color(white: 0.5))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

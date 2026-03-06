@@ -259,14 +259,13 @@ struct CameraFlowView: View {
             .offset(y: cameraOffset)
             .allowsHitTesting(!cameraSlid)
         }
-        .sheet(isPresented: $showGallery) {
+        .fullScreenCover(isPresented: $showGallery) {
             GalleryPickerView(
                 onCapture: { image in
-                    showGallery = false
                     capturedImage = image
-                    withAnimation(.easeInOut(duration: 0.45)) {
-                        cameraOffset = screenH
-                    }
+                    cameraSlid = true
+                    cameraOffset = screenH
+                    showGallery = false
                 },
                 onDismiss: { showGallery = false }
             )
