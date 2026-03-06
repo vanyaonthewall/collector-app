@@ -220,8 +220,7 @@ struct CameraFlowView: View {
     @State private var showGallery = false
 
     private var screenH: CGFloat {
-        (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
-            .keyWindow?.bounds.height ?? 844
+        UIScreen.main.bounds.height + 100
     }
 
     var body: some View {

@@ -60,7 +60,9 @@ private struct IcPlus: View {
     }
 }
 
-private struct IcEdit: View {
+struct IcEdit: View {
+    var color: Color = .white
+
     var body: some View {
         Canvas { context, size in
             let s = size.width / 24
@@ -120,7 +122,7 @@ private struct IcEdit: View {
             p.addCurve(to: pt(20.3822, 8.07187), control1: pt(20.4135, 8.03378), control2: pt(20.3996, 8.05446))
             p.closeSubpath()
 
-            context.fill(p, with: .color(.white))
+            context.fill(p, with: .color(color))
         }
     }
 }
@@ -153,6 +155,91 @@ private struct IcChevron: View {
             p.addLine(to: pt(15.397, 19.1026))
             p.closeSubpath()
             context.fill(p, with: .color(.white))
+        }
+    }
+}
+
+private struct IcTrash: View {
+    var color: Color = .white
+
+    var body: some View {
+        Canvas { context, size in
+            let s = size.width / 24
+            func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x * s, y: y * s) }
+
+            var p = Path()
+
+            // Lid bar + bin body
+            p.move(to: pt(20.25, 4.6875))
+            p.addLine(to: pt(16.3125, 4.6875))
+            p.addLine(to: pt(16.3125, 3.75))
+            p.addCurve(to: pt(15.7084, 2.29159), control1: pt(16.3125, 3.20299), control2: pt(16.0952, 2.67839))
+            p.addCurve(to: pt(14.25, 1.6875),    control1: pt(15.3216, 1.9048),  control2: pt(14.797, 1.6875))
+            p.addLine(to: pt(9.75, 1.6875))
+            p.addCurve(to: pt(8.29159, 2.29159), control1: pt(9.20299, 1.6875),  control2: pt(8.67839, 1.9048))
+            p.addCurve(to: pt(7.6875, 3.75),     control1: pt(7.9048, 2.67839),  control2: pt(7.6875, 3.20299))
+            p.addLine(to: pt(7.6875, 4.6875))
+            p.addLine(to: pt(3.75, 4.6875))
+            p.addCurve(to: pt(3.35225, 4.85225), control1: pt(3.60082, 4.6875),  control2: pt(3.45774, 4.74676))
+            p.addCurve(to: pt(3.1875, 5.25),     control1: pt(3.24676, 4.95774), control2: pt(3.1875, 5.10082))
+            p.addCurve(to: pt(3.35225, 5.64775), control1: pt(3.1875, 5.39918),  control2: pt(3.24676, 5.54226))
+            p.addCurve(to: pt(3.75, 5.8125),     control1: pt(3.45774, 5.75324), control2: pt(3.60082, 5.8125))
+            p.addLine(to: pt(4.6875, 5.8125))
+            p.addLine(to: pt(4.6875, 19.5))
+            p.addCurve(to: pt(5.07192, 20.4281), control1: pt(4.6875, 19.8481),  control2: pt(4.82578, 20.1819))
+            p.addCurve(to: pt(6, 20.8125),       control1: pt(5.31806, 20.6742), control2: pt(5.6519, 20.8125))
+            p.addLine(to: pt(18, 20.8125))
+            p.addCurve(to: pt(18.9281, 20.4281), control1: pt(18.3481, 20.8125), control2: pt(18.6819, 20.6742))
+            p.addCurve(to: pt(19.3125, 19.5),   control1: pt(19.1742, 20.1819), control2: pt(19.3125, 19.8481))
+            p.addLine(to: pt(19.3125, 5.8125))
+            p.addLine(to: pt(20.25, 5.8125))
+            p.addCurve(to: pt(20.6477, 5.64775), control1: pt(20.3992, 5.8125),  control2: pt(20.5423, 5.75324))
+            p.addCurve(to: pt(20.8125, 5.25),    control1: pt(20.7532, 5.54226), control2: pt(20.8125, 5.39918))
+            p.addCurve(to: pt(20.6477, 4.85225), control1: pt(20.8125, 5.10082), control2: pt(20.7532, 4.95774))
+            p.addCurve(to: pt(20.25, 4.6875),    control1: pt(20.5423, 4.74676), control2: pt(20.3992, 4.6875))
+            p.closeSubpath()
+
+            // Handle tab
+            p.move(to: pt(8.8125, 3.75))
+            p.addCurve(to: pt(9.08709, 3.08709), control1: pt(8.8125, 3.50136),  control2: pt(8.91127, 3.2629))
+            p.addCurve(to: pt(9.75, 2.8125),     control1: pt(9.2629, 2.91127),  control2: pt(9.50136, 2.8125))
+            p.addLine(to: pt(14.25, 2.8125))
+            p.addCurve(to: pt(14.9129, 3.08709), control1: pt(14.4986, 2.8125),  control2: pt(14.7371, 2.91127))
+            p.addCurve(to: pt(15.1875, 3.75),    control1: pt(15.0887, 3.2629),  control2: pt(15.1875, 3.50136))
+            p.addLine(to: pt(15.1875, 4.6875))
+            p.addLine(to: pt(8.8125, 4.6875))
+            p.addLine(to: pt(8.8125, 3.75))
+            p.closeSubpath()
+
+            // Left line
+            p.move(to: pt(10.3125, 9.75))
+            p.addLine(to: pt(10.3125, 15.75))
+            p.addCurve(to: pt(10.1477, 16.1477), control1: pt(10.3125, 15.8992), control2: pt(10.2532, 16.0423))
+            p.addCurve(to: pt(9.75, 16.3125),    control1: pt(10.0423, 16.2532), control2: pt(9.89918, 16.3125))
+            p.addCurve(to: pt(9.35225, 16.1477), control1: pt(9.60082, 16.3125), control2: pt(9.45774, 16.2532))
+            p.addCurve(to: pt(9.1875, 15.75),    control1: pt(9.24676, 16.0423), control2: pt(9.1875, 15.8992))
+            p.addLine(to: pt(9.1875, 9.75))
+            p.addCurve(to: pt(9.35225, 9.35225), control1: pt(9.1875, 9.60082),  control2: pt(9.24676, 9.45774))
+            p.addCurve(to: pt(9.75, 9.1875),     control1: pt(9.45774, 9.24676), control2: pt(9.60082, 9.1875))
+            p.addCurve(to: pt(10.1477, 9.35225), control1: pt(9.89918, 9.1875),  control2: pt(10.0423, 9.24676))
+            p.addCurve(to: pt(10.3125, 9.75),    control1: pt(10.2532, 9.45774), control2: pt(10.3125, 9.60082))
+            p.closeSubpath()
+
+            // Right line
+            p.move(to: pt(14.8125, 9.75))
+            p.addLine(to: pt(14.8125, 15.75))
+            p.addCurve(to: pt(14.6477, 16.1477), control1: pt(14.8125, 15.8992), control2: pt(14.7532, 16.0423))
+            p.addCurve(to: pt(14.25, 16.3125),   control1: pt(14.5423, 16.2532), control2: pt(14.3992, 16.3125))
+            p.addCurve(to: pt(13.8523, 16.1477), control1: pt(14.1008, 16.3125), control2: pt(13.9577, 16.2532))
+            p.addCurve(to: pt(13.6875, 15.75),   control1: pt(13.7468, 16.0423), control2: pt(13.6875, 15.8992))
+            p.addLine(to: pt(13.6875, 9.75))
+            p.addCurve(to: pt(13.8523, 9.35225), control1: pt(13.6875, 9.60082), control2: pt(13.7468, 9.45774))
+            p.addCurve(to: pt(14.25, 9.1875),    control1: pt(13.9577, 9.24676), control2: pt(14.1008, 9.1875))
+            p.addCurve(to: pt(14.6477, 9.35225), control1: pt(14.3992, 9.1875),  control2: pt(14.5423, 9.24676))
+            p.addCurve(to: pt(14.8125, 9.75),    control1: pt(14.7532, 9.45774), control2: pt(14.8125, 9.60082))
+            p.closeSubpath()
+
+            context.fill(p, with: .color(color))
         }
     }
 }
@@ -245,6 +332,31 @@ struct FolderEditButton: View {
             IcEdit()
                 .frame(width: 24, height: 24)
                 .padding(12)
+                .background(
+                    ZStack {
+                        VariableBlurView(intensity: 0.08).clipShape(Circle())
+                        Circle().fill(
+                            isPressed
+                                ? Color(red: 107/255, green: 107/255, blue: 107/255, opacity: 0.4)
+                                : Color(red: 134/255, green: 134/255, blue: 134/255, opacity: 0.4)
+                        )
+                    }
+                )
+        }
+        .buttonStyle(CollectorButtonStyle(isPressed: $isPressed))
+    }
+}
+
+struct ItemDeleteButton: View {
+    let action: () -> Void
+
+    @State private var isPressed = false
+
+    var body: some View {
+        Button(action: action) {
+            IcTrash(color: .white)
+                .frame(width: 32, height: 32)
+                .padding(8)
                 .background(
                     ZStack {
                         VariableBlurView(intensity: 0.08).clipShape(Circle())

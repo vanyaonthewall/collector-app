@@ -45,6 +45,8 @@ struct FolderDetailView: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var isEditing = false
     @State private var editName = ""
+    @State private var selectedItem: CollectionItem? = nil
+    @State private var deletingItemId: UUID? = nil
 
     private var isScrolled: Bool { scrollOffset > 20 }
 
@@ -78,7 +80,12 @@ struct FolderDetailView: View {
                         Color.clear.frame(height: headerH + 20)
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 140))], spacing: 24) {
                             ForEach(folder.items) { item in
-                                ItemCell(item: item, rotation: itemRotation(for: item))
+                                Button { selectedItem = item } label: {
+                                    ItemCell(item: item, rotation: itemRotation(for: item))
+                                }
+                                .buttonStyle(.plain)
+                                .scaleEffect(deletingItemId == item.id ? 0 : 1.0)
+                                .animation(.spring(response: 0.35, dampingFraction: 0.7), value: deletingItemId)
                             }
                         }
                         .padding(.horizontal, 24)
@@ -140,6 +147,16 @@ struct FolderDetailView: View {
                     onDismiss()
                 }
         )
+        .sheet(item: $selectedItem) { item in
+            ItemDetailView(item: item, onDelete: {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                deletingItemId = item.id
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    modelContext.delete(item)
+                    deletingItemId = nil
+                }
+            })
+        }
         .alert("Edit Collection", isPresented: $isEditing) {
             TextField("Name", text: $editName)
             Button("Delete", role: .destructive) {

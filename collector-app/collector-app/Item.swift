@@ -6,6 +6,7 @@ class CollectionItem {
     var id: UUID
     var createdAt: Date
     var folder: Folder?
+    var name: String = "Предмет"
 
     init(folder: Folder? = nil) {
         self.id = UUID()

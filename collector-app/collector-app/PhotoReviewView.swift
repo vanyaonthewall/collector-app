@@ -30,10 +30,12 @@ private struct FolderPreviewCell: View {
                    fillOpacity: isSelected ? 0.5 : 0.1,
                    previewImages: previewImages)
             .task(id: folder.items.count) {
-                let items = Array(folder.items.suffix(3))
-                let images = await Task.detached(priority: .userInitiated) {
-                    items.compactMap { ImageStorage.load(id: $0.id) }
-                }.value
+                let ids = Array(folder.items.suffix(3).map { $0.id })
+                let images = await withCheckedContinuation { (cont: CheckedContinuation<[UIImage], Never>) in
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        cont.resume(returning: ids.compactMap { ImageStorage.load(id: $0) })
+                    }
+                }
                 previewImages = images
             }
     }
@@ -127,8 +129,13 @@ struct PhotoReviewView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .allowsHitTesting(false)
 
-                // Нижняя панель — папки + кнопка
-                VStack(spacing: 36) {
+                // Заглушка высоты нижней панели — удерживает лоадер на месте
+                if isProcessing {
+                    Color.clear.frame(height: 36 + folderAreaH + 36 + 64 + bottomInset + 16)
+                }
+
+                // Папки — появляются справа
+                if !isProcessing {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 16) {
                             ForEach(Array(folders.enumerated()), id: \.element.id) { index, folder in
@@ -172,26 +179,42 @@ struct PhotoReviewView: View {
                     .frame(height: folderAreaH)
                     .contentShape(Rectangle())
                     .allowsHitTesting(true)
+                    .padding(.top, 36)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .opacity
+                    ))
+                }
 
+                // Кнопка — появляется снизу
+                if !isProcessing {
                     Button { triggerSave() } label: {
                         Text("Поместить")
                             .font(.system(size: 16, design: .monospaced))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(canSave ? .white : Color(white: 0.5))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 20)
                             .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color(red: 54/255, green: 54/255, blue: 54/255))
+                                ZStack {
+                                    VariableBlurView(intensity: 0.08)
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color(red: 54/255, green: 54/255, blue: 54/255))
+                                        .opacity(canSave ? 1.0 : 0.0)
+                                }
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
                             )
+                            .animation(.easeInOut(duration: 0.2), value: canSave)
                     }
-                    .opacity(canSave ? 1.0 : 0.4)
                     .disabled(!canSave || isSaving)
                     .padding(.horizontal, 24)
+                    .padding(.top, 36)
+                    .padding(.bottom, bottomInset + 16)
                     .allowsHitTesting(true)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .opacity
+                    ))
                 }
-                .padding(.top, 36)
-                .padding(.bottom, bottomInset + 16)
-                .allowsHitTesting(true)
             }
         }
         .ignoresSafeArea()
@@ -234,16 +257,17 @@ struct PhotoReviewView: View {
     }
 
     private func processImage() async {
+        let image = originalImage
         do {
-            let result = try await BackgroundRemovalService.removeBackground(from: originalImage)
-            await MainActor.run {
-                withAnimation(.spring(response: 0.42, dampingFraction: 0.62)) {
-                    processedImage = result
-                    isProcessing = false
-                }
+            let result = try await Task.detached(priority: .utility) {
+                try await BackgroundRemovalService.removeBackground(from: image)
+            }.value
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.62)) {
+                processedImage = result
+                isProcessing = false
             }
         } catch {
-            await MainActor.run {
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.62)) {
                 processingError = "Предмет не найден"
                 isProcessing = false
             }
@@ -256,7 +280,9 @@ struct PhotoReviewView: View {
             return
         }
         print("💾 Сохраняем item в папку '\(folder.name)'")
+        let count = folder.items.count
         let item = CollectionItem(folder: folder)
+        item.name = "Предмет \(count + 1)"
         do {
             try ImageStorage.save(img, id: item.id)
             print("📁 Image сохранён: \(item.id)")
