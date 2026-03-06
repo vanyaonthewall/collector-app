@@ -31,6 +31,55 @@ private struct FolderFrameKey: PreferenceKey {
     }
 }
 
+private struct FolderCell: View {
+    let folder: Folder
+    var animateTrigger: Bool = false
+
+    @State private var previewImages: [UIImage] = []
+    @State private var newItemScale: CGFloat = 1.0
+    @State private var hasPendingAnimation = false
+    @State private var pendingAnimationRequested = false
+
+    private func playAnimation() {
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.65)) {
+            newItemScale = 1.0
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+            hasPendingAnimation = false
+        }
+    }
+
+    var body: some View {
+        FolderView(
+            name: folder.name,
+            previewImages: previewImages,
+            lastImageScale: hasPendingAnimation ? newItemScale : 1.0
+        )
+        .task(id: folder.items.count) {
+            let items = Array(folder.items.suffix(3))
+            let images = await Task.detached(priority: .userInitiated) {
+                items.compactMap { ImageStorage.load(id: $0.id) }
+            }.value
+            // Анимируем только если был явный внешний запрос
+            let shouldAnimate = images.count > previewImages.count && pendingAnimationRequested
+            pendingAnimationRequested = false
+            if shouldAnimate {
+                newItemScale = 0
+                hasPendingAnimation = true
+            }
+            previewImages = images
+            if shouldAnimate {
+                try? await Task.sleep(nanoseconds: 16_000_000)
+                playAnimation()
+            }
+        }
+        .onChange(of: animateTrigger) { _, triggered in
+            guard triggered else { return }
+            pendingAnimationRequested = true
+        }
+    }
+}
+
 struct HomeView: View {
     @Query(sort: \Folder.createdAt) var folders: [Folder]
     @Environment(\.modelContext) private var modelContext
@@ -50,6 +99,9 @@ struct HomeView: View {
     @State private var tappedAnchor: UnitPoint = .center
     @State private var folderFrames: [Int: CGRect] = [:]
 
+    @State private var showCameraFlow = false
+    @State private var bouncingFolderName: String? = nil
+
     private var isScrolled: Bool { scrollOffset > 20 }
 
     private func gridColumns(for width: CGFloat) -> [GridItem] {
@@ -62,16 +114,17 @@ struct HomeView: View {
     }
 
     private func folderRotation(_ name: String) -> Double {
-        let sum = name.utf8.reduce(0) { Int($0) &+ Int($1) }
+        let sum: Int = name.utf8.reduce(0) { $0 &+ Int($1) }
         return Double(sum % 21) - 10.0
     }
 
     private func openFolder(_ folder: Folder) {
-        let screen = UIScreen.main.bounds
+        let screenBounds = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
+            .keyWindow?.bounds ?? CGRect(x: 0, y: 0, width: 390, height: 844)
         if let frame = folderFrames[folder.name.hashValue] {
             tappedAnchor = UnitPoint(
-                x: frame.midX / screen.width,
-                y: frame.midY / screen.height
+                x: frame.midX / screenBounds.width,
+                y: frame.midY / screenBounds.height
             )
         } else {
             tappedAnchor = .center
@@ -116,13 +169,15 @@ struct HomeView: View {
                     ) {
                     ForEach(folders) { folder in
                         let isNew = folder.name == newlyAddedFolderName && newFolderIsAnimating
+                        let isBouncing = bouncingFolderName == folder.name
                         Button { openFolder(folder) } label: {
-                            FolderView(name: folder.name)
+                            FolderCell(folder: folder, animateTrigger: isBouncing)
                         }
                         .buttonStyle(.plain)
-                        .scaleEffect(isNew ? 1.2 : 1.0)
-                        .rotationEffect(.degrees(folderRotation(folder.name) + (isNew ? 10 : 0)))
+                        .scaleEffect(isNew ? 1.2 : (isBouncing ? 1.15 : 1.0))
+                        .rotationEffect(.degrees(folderRotation(folder.name) + (isNew ? 10 : 0) + (isBouncing ? 6 : 0)))
                         .animation(.spring(response: 0.5, dampingFraction: 0.65), value: isNew)
+                        .animation(.spring(response: 0.35, dampingFraction: 0.45), value: isBouncing)
                         .onAppear {
                             guard folder.name == newlyAddedFolderName, newFolderIsAnimating else { return }
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -195,7 +250,7 @@ struct HomeView: View {
 
             } // ScrollViewReader
 
-                MainButton(action: {})
+                MainButton(action: { showCameraFlow = true })
                     .padding(.bottom, 30)
                     .zIndex(2)
                     .offset(y: showDetail ? 150 : 0)
@@ -224,16 +279,31 @@ struct HomeView: View {
         }
         .overlay(alignment: .topLeading) {
             if showDetail, let folder = selectedFolder {
+                let screenBounds = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
+                    .keyWindow?.bounds ?? CGRect(x: 0, y: 0, width: 390, height: 844)
                 FolderDetailView(folder: folder, onDismiss: closeFolder)
                     .frame(
-                        width: UIScreen.main.bounds.width,
-                        height: UIScreen.main.bounds.height
+                        width: screenBounds.width,
+                        height: screenBounds.height
                     )
                     .ignoresSafeArea()
                     .scaleEffect(detailScale, anchor: tappedAnchor)
                     .opacity(detailOpacity)
                     .blur(radius: detailBlur)
             }
+        }
+        .fullScreenCover(isPresented: $showCameraFlow) {
+            CameraFlowView(
+                onDismiss: { showCameraFlow = false },
+                onItemSaved: { _, folder in
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    bouncingFolderName = folder.name
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+                        bouncingFolderName = nil
+                    }
+                }
+            )
+            .ignoresSafeArea()
         }
     }
 }

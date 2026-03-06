@@ -85,29 +85,56 @@ struct FolderShape: Shape {
 
 struct FolderView: View {
     var name: String = "text-folder"
+    var fillOpacity: Double = 0.1
+    var previewImages: [UIImage] = []
+    var lastImageScale: CGFloat = 1.0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            FolderShape()
-                .fill(Color(red: 106/255, green: 106/255, blue: 106/255, opacity: 0.1))
-                .background(
-                    VariableBlurView(intensity: 0.2)
-                        .clipShape(FolderShape())
-                )
-                .overlay(
-                    FolderShape()
-                        .stroke(
-                            LinearGradient(
-                                stops: [
-                                    .init(color: Color(red: 201/255, green: 201/255, blue: 201/255, opacity: 0.5), location: 0),
-                                    .init(color: Color(red: 201/255, green: 201/255, blue: 201/255, opacity: 0), location: 1)
-                                ],
-                                startPoint: UnitPoint(x: -0.028, y: 0.549),
-                                endPoint: UnitPoint(x: 0.576, y: 0.082)
-                            ),
-                            lineWidth: 1
-                        )
-                )
+            ZStack(alignment: .bottom) {
+                // Превью предметов — торчат из-под папки сверху
+                if !previewImages.isEmpty {
+                    let shown = Array(previewImages.suffix(3))
+                    let rotations: [Double] = [-10, -2, 6]
+                    let size: CGFloat = 93
+
+                    ZStack {
+                        ForEach(0..<shown.count, id: \.self) { i in
+                            Image(uiImage: shown[i])
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: size, height: size)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .rotationEffect(.degrees(rotations[i % 3]))
+                                .offset(x: CGFloat(i) * 28 - CGFloat(shown.count - 1) * 14)
+                                .scaleEffect(i == shown.count - 1 ? lastImageScale : 1.0)
+                        }
+                    }
+                    .offset(x: 10, y: -40)
+                }
+
+                FolderShape()
+                    .fill(Color(red: 106/255, green: 106/255, blue: 106/255, opacity: fillOpacity))
+                    .background(
+                        VariableBlurView(intensity: 0.2)
+                            .clipShape(FolderShape())
+                    )
+                    .overlay(
+                        FolderShape()
+                            .stroke(
+                                LinearGradient(
+                                    stops: [
+                                        .init(color: Color(red: 201/255, green: 201/255, blue: 201/255, opacity: 0.5), location: 0),
+                                        .init(color: Color(red: 201/255, green: 201/255, blue: 201/255, opacity: 0), location: 1)
+                                    ],
+                                    startPoint: UnitPoint(x: -0.028, y: 0.549),
+                                    endPoint: UnitPoint(x: 0.576, y: 0.082)
+                                ),
+                                lineWidth: 1
+                            )
+                    )
+                    .frame(width: 160, height: 130)
+            }
             .frame(width: 160, height: 130)
             .id(name)
 

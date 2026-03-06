@@ -2,6 +2,40 @@ import SwiftUI
 import SwiftData
 import UIKit
 
+// MARK: - Async image cell
+
+private struct ItemCell: View {
+    let item: CollectionItem
+    let rotation: Double
+
+    @State private var image: UIImage? = nil
+
+    var body: some View {
+        Group {
+            if let img = image {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 160)
+                    .rotationEffect(.degrees(rotation))
+            } else {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color(white: 0.92))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 160)
+            }
+        }
+        .task(id: item.id) {
+            let id = item.id
+            let loaded = await Task.detached(priority: .userInitiated) {
+                ImageStorage.load(id: id)
+            }.value
+            image = loaded
+        }
+    }
+}
+
 struct FolderDetailView: View {
     var folder: Folder
     var onDismiss: () -> Void
@@ -13,6 +47,13 @@ struct FolderDetailView: View {
     @State private var editName = ""
 
     private var isScrolled: Bool { scrollOffset > 20 }
+
+    private func itemRotation(for item: CollectionItem) -> Double {
+        let sum: Int = folder.name.utf8.reduce(0) { $0 &+ Int($1) }
+        let baseRotation = Double(sum % 21) - 10.0
+        let itemIndex = folder.items.firstIndex(where: { $0.id == item.id }) ?? 0
+        return baseRotation + Double((itemIndex * 3) % 8) - 4.0
+    }
 
     private var topInset: CGFloat {
         (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
@@ -26,15 +67,29 @@ struct FolderDetailView: View {
             Color.white.ignoresSafeArea()
                 .overlay(DotPattern().ignoresSafeArea())
 
-            ScrollView {
-                Color.clear.frame(height: headerH + 20)
-                // future folder content
-                Color.clear.frame(height: 120)
-            }
-            .onScrollGeometryChange(for: CGFloat.self) { scrollGeo in
-                scrollGeo.contentOffset.y
-            } action: { _, offset in
-                scrollOffset = max(0, offset)
+            if folder.items.isEmpty {
+                Text("пока ничего нет")
+                    .font(.system(size: 13, design: .monospaced))
+                    .foregroundStyle(Color(white: 0.5))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    VStack(spacing: 24) {
+                        Color.clear.frame(height: headerH + 20)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 140))], spacing: 24) {
+                            ForEach(folder.items) { item in
+                                ItemCell(item: item, rotation: itemRotation(for: item))
+                            }
+                        }
+                        .padding(.horizontal, 24)
+                        Color.clear.frame(height: 40)
+                    }
+                }
+                .onScrollGeometryChange(for: CGFloat.self) { scrollGeo in
+                    scrollGeo.contentOffset.y
+                } action: { _, offset in
+                    scrollOffset = max(0, offset)
+                }
             }
 
             ZStack {
@@ -85,68 +140,30 @@ struct FolderDetailView: View {
                     onDismiss()
                 }
         )
-        .sheet(isPresented: $isEditing) {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Edit Collection")
-                    .font(.system(size: 17, weight: .regular, design: .monospaced))
-                    .kerning(-1)
-                    .foregroundStyle(.black)
-
-                TextField("Name", text: $editName)
-                    .font(.system(size: 15, design: .monospaced))
-                    .textFieldStyle(.roundedBorder)
-
-                HStack(spacing: 12) {
-                    Button {
-                        modelContext.delete(folder)
-                        isEditing = false
-                        onDismiss()
-                    } label: {
-                        Text("Delete")
-                            .font(.system(size: 15, design: .monospaced))
-                            .foregroundStyle(.red)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background {
-                                ZStack {
-                                    VariableBlurView(intensity: 0.08)
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(Color(red: 134/255, green: 134/255, blue: 134/255, opacity: 0.4))
-                                }
-                            }
-                    }
-
-                    Button {
-                        let trimmed = editName.trimmingCharacters(in: .whitespaces)
-                        if !trimmed.isEmpty { folder.name = trimmed }
-                        isEditing = false
-                    } label: {
-                        Text("Save")
-                            .font(.system(size: 15, design: .monospaced))
-                            .foregroundStyle(.black)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background {
-                                ZStack {
-                                    VariableBlurView(intensity: 0.08)
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(Color(red: 134/255, green: 134/255, blue: 134/255, opacity: 0.4))
-                                }
-                            }
-                    }
-                }
+        .alert("Edit Collection", isPresented: $isEditing) {
+            TextField("Name", text: $editName)
+            Button("Delete", role: .destructive) {
+                modelContext.delete(folder)
+                onDismiss()
             }
-            .padding(24)
-            .presentationDetents([.height(210)])
-            .presentationDragIndicator(.visible)
-            .presentationBackground {
-                ZStack {
-                    VariableBlurView(intensity: 0.2)
-                    Color(red: 106/255, green: 106/255, blue: 106/255, opacity: 0.1)
-                }
+            Button("Save") {
+                let trimmed = editName.trimmingCharacters(in: .whitespaces)
+                if !trimmed.isEmpty { folder.name = trimmed }
             }
+            Button("Cancel", role: .cancel) {}
         }
+    }
+}
+
+struct FolderDetailView_Previews: PreviewProvider {
+    static var previews: some View {
+        let types: [any PersistentModel.Type] = [Folder.self, CollectionItem.self]
+        let schema = Schema(types)
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try! ModelContainer(for: schema, configurations: config)
+        let folder = Folder(name: "Test Folder")
+        container.mainContext.insert(folder)
+        return FolderDetailView(folder: folder, onDismiss: {})
+            .modelContainer(container)
     }
 }
