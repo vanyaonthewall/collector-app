@@ -24,13 +24,6 @@ struct DotPattern: View {
     }
 }
 
-private struct FolderFrameKey: PreferenceKey {
-    static var defaultValue: [Int: CGRect] = [:]
-    static func reduce(value: inout [Int: CGRect], nextValue: () -> [Int: CGRect]) {
-        value.merge(nextValue()) { _, new in new }
-    }
-}
-
 private struct FolderCell: View {
     let folder: Folder
     var animateTrigger: Bool = false
@@ -91,16 +84,10 @@ struct HomeView: View {
     @State private var newlyAddedFolderName: String? = nil
     @State private var newFolderIsAnimating = false
 
-    @State private var selectedFolder: Folder? = nil
-    @State private var showDetail = false
-    @State private var detailScale: CGFloat = 0.0
-    @State private var detailOpacity: Double = 0.0
-    @State private var detailBlur: CGFloat = 20
-    @State private var tappedAnchor: UnitPoint = .center
-    @State private var folderFrames: [Int: CGRect] = [:]
-
     @State private var showCameraFlow = false
     @State private var bouncingFolderName: String? = nil
+    @State private var navigationPath = NavigationPath()
+    @State private var tappingFolderID: PersistentIdentifier? = nil
 
     private var isScrolled: Bool { scrollOffset > 20 }
 
@@ -118,44 +105,8 @@ struct HomeView: View {
         return Double(sum % 21) - 10.0
     }
 
-    private func openFolder(_ folder: Folder) {
-        let screenBounds = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
-            .keyWindow?.bounds ?? CGRect(x: 0, y: 0, width: 390, height: 844)
-        if let frame = folderFrames[folder.name.hashValue] {
-            tappedAnchor = UnitPoint(
-                x: frame.midX / screenBounds.width,
-                y: frame.midY / screenBounds.height
-            )
-        } else {
-            tappedAnchor = .center
-        }
-        detailBlur = 20
-        selectedFolder = folder
-        showDetail = true
-
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-            detailScale = 1.0
-            detailOpacity = 1.0
-            detailBlur = 0
-        }
-    }
-
-    private func closeFolder() {
-        withAnimation(.easeIn(duration: 0.15)) { detailBlur = 20 }
-        withAnimation(.easeIn(duration: 0.25)) {
-            detailScale = 0.0
-            detailOpacity = 0.0
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            showDetail = false
-            selectedFolder = nil
-            detailScale = 0.0
-            detailOpacity = 0.0
-            detailBlur = 20
-        }
-    }
-
     var body: some View {
+        NavigationStack(path: $navigationPath) {
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
                 Color.white.ignoresSafeArea()
@@ -170,14 +121,25 @@ struct HomeView: View {
                     ForEach(folders) { folder in
                         let isNew = folder.name == newlyAddedFolderName && newFolderIsAnimating
                         let isBouncing = bouncingFolderName == folder.name
-                        Button { openFolder(folder) } label: {
+                        let isTapping = tappingFolderID == folder.persistentModelID
+                        Button {
+                            guard tappingFolderID == nil else { return }
+                            tappingFolderID = folder.persistentModelID
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+                                navigationPath.append(folder.persistentModelID)
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                                    tappingFolderID = nil
+                                }
+                            }
+                        } label: {
                             FolderCell(folder: folder, animateTrigger: isBouncing)
+                                .scaleEffect(isNew ? 1.2 : (isBouncing ? 1.15 : (isTapping ? 1.2 : 1.0)))
+                                .rotationEffect(.degrees(folderRotation(folder.name) + (isNew ? 10 : 0) + (isBouncing ? 6 : 0) + (isTapping ? 10 : 0)))
+                                .animation(.spring(response: 0.5, dampingFraction: 0.65), value: isNew)
+                                .animation(.spring(response: 0.35, dampingFraction: 0.45), value: isBouncing)
+                                .animation(.spring(response: 0.28, dampingFraction: 0.6), value: isTapping)
                         }
                         .buttonStyle(.plain)
-                        .scaleEffect(isNew ? 1.2 : (isBouncing ? 1.15 : 1.0))
-                        .rotationEffect(.degrees(folderRotation(folder.name) + (isNew ? 10 : 0) + (isBouncing ? 6 : 0)))
-                        .animation(.spring(response: 0.5, dampingFraction: 0.65), value: isNew)
-                        .animation(.spring(response: 0.35, dampingFraction: 0.45), value: isBouncing)
                         .onAppear {
                             guard folder.name == newlyAddedFolderName, newFolderIsAnimating else { return }
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -190,15 +152,7 @@ struct HomeView: View {
                                 newlyAddedFolderName = nil
                             }
                         }
-                        .background(
-                            GeometryReader { geo in
-                                Color.clear.preference(
-                                    key: FolderFrameKey.self,
-                                    value: [folder.name.hashValue: geo.frame(in: .global)]
-                                )
-                            }
-                        )
-                        .id(folder.id)
+                        .id(folder.persistentModelID)
                     }
                 }
                 .padding(.horizontal, 24)
@@ -231,7 +185,7 @@ struct HomeView: View {
                 .padding(.bottom, 16)
                 .background {
                     ZStack {
-                        VariableBlurView(intensity: 0.08)
+                        VariableBlurView(intensity: isScrolled ? 0.032 : 0)
                         LinearGradient(
                             stops: [
                                 .init(color: .white.opacity(1.0), location: 0),
@@ -241,10 +195,10 @@ struct HomeView: View {
                             startPoint: .top,
                             endPoint: .bottom
                         )
+                        .opacity(isScrolled ? 1 : 0)
+                        .animation(.easeInOut(duration: 0.2), value: isScrolled)
                     }
-                    .opacity(isScrolled ? 1 : 0)
                     .ignoresSafeArea()
-                    .animation(.easeInOut(duration: 0.2), value: isScrolled)
                 }
             }
 
@@ -253,13 +207,6 @@ struct HomeView: View {
                 MainButton(action: { showCameraFlow = true })
                     .padding(.bottom, 30)
                     .zIndex(2)
-                    .offset(y: showDetail ? 150 : 0)
-                    .opacity(showDetail ? 0 : 1)
-                    .disabled(showDetail)
-                    .animation(.easeIn(duration: 0.2), value: showDetail)
-            }
-            .onPreferenceChange(FolderFrameKey.self) { frames in
-                folderFrames = frames
             }
             .ignoresSafeArea(.keyboard)
             .alert("New Collection", isPresented: $isCreatingFolder) {
@@ -277,21 +224,14 @@ struct HomeView: View {
                 }
             }
         }
-        .overlay(alignment: .topLeading) {
-            if showDetail, let folder = selectedFolder {
-                let screenBounds = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
-                    .keyWindow?.bounds ?? CGRect(x: 0, y: 0, width: 390, height: 844)
-                FolderDetailView(folder: folder, onDismiss: closeFolder)
-                    .frame(
-                        width: screenBounds.width,
-                        height: screenBounds.height
-                    )
-                    .ignoresSafeArea()
-                    .scaleEffect(detailScale, anchor: tappedAnchor)
-                    .opacity(detailOpacity)
-                    .blur(radius: detailBlur)
+        .toolbar(.hidden, for: .navigationBar)
+        .navigationDestination(for: PersistentIdentifier.self) { id in
+            if let folder = folders.first(where: { $0.persistentModelID == id }) {
+                FolderDetailView(folder: folder)
+                    .toolbar(.hidden, for: .navigationBar)
             }
         }
+        } // NavigationStack
         .fullScreenCover(isPresented: $showCameraFlow) {
             CameraFlowView(
                 onDismiss: { showCameraFlow = false },

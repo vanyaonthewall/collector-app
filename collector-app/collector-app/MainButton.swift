@@ -259,7 +259,7 @@ struct MainButton: View {
                 .padding(padding)
                 .background(
                     ZStack {
-                        VariableBlurView(intensity: 0.08).clipShape(Circle())
+                        VariableBlurView(intensity: 0.1).clipShape(Circle())
                         Circle().fill(
                             isPressed
                                 ? Color(red: 107/255, green: 107/255, blue: 107/255, opacity: 0.4)
@@ -284,7 +284,7 @@ struct SecondaryButton: View {
                 .padding(8)
                 .background(
                     ZStack {
-                        VariableBlurView(intensity: 0.08).clipShape(Circle())
+                        VariableBlurView(intensity: 0.1).clipShape(Circle())
                         Circle().fill(
                             isPressed
                                 ? Color(red: 107/255, green: 107/255, blue: 107/255, opacity: 0.4)
@@ -309,7 +309,7 @@ struct BackButton: View {
                 .padding(12)
                 .background(
                     ZStack {
-                        VariableBlurView(intensity: 0.08).clipShape(Circle())
+                        VariableBlurView(intensity: 0.1).clipShape(Circle())
                         Circle().fill(
                             isPressed
                                 ? Color(red: 107/255, green: 107/255, blue: 107/255, opacity: 0.4)
@@ -334,7 +334,7 @@ struct FolderEditButton: View {
                 .padding(12)
                 .background(
                     ZStack {
-                        VariableBlurView(intensity: 0.08).clipShape(Circle())
+                        VariableBlurView(intensity: 0.1).clipShape(Circle())
                         Circle().fill(
                             isPressed
                                 ? Color(red: 107/255, green: 107/255, blue: 107/255, opacity: 0.4)
@@ -359,7 +359,7 @@ struct ItemDeleteButton: View {
                 .padding(8)
                 .background(
                     ZStack {
-                        VariableBlurView(intensity: 0.08).clipShape(Circle())
+                        VariableBlurView(intensity: 0.1).clipShape(Circle())
                         Circle().fill(
                             isPressed
                                 ? Color(red: 107/255, green: 107/255, blue: 107/255, opacity: 0.4)

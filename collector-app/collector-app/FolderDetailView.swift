@@ -2,6 +2,16 @@ import SwiftUI
 import SwiftData
 import UIKit
 
+private struct BackSwipeEnabler: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> UIViewController { UIViewController() }
+    func updateUIViewController(_ vc: UIViewController, context: Context) {
+        DispatchQueue.main.async {
+            vc.navigationController?.interactivePopGestureRecognizer?.isEnabled = true
+            vc.navigationController?.interactivePopGestureRecognizer?.delegate = nil
+        }
+    }
+}
+
 // MARK: - Async image cell
 
 private struct ItemCell: View {
@@ -38,9 +48,9 @@ private struct ItemCell: View {
 
 struct FolderDetailView: View {
     var folder: Folder
-    var onDismiss: () -> Void
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
 
     @State private var scrollOffset: CGFloat = 0
     @State private var isEditing = false
@@ -107,7 +117,7 @@ struct FolderDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
 
                 HStack {
-                    BackButton(action: onDismiss)
+                    BackButton(action: { dismiss() })
                     Spacer()
                     FolderEditButton(action: {
                         editName = folder.name
@@ -120,7 +130,7 @@ struct FolderDetailView: View {
             .padding(.bottom, 16)
             .background {
                 ZStack {
-                    VariableBlurView(intensity: 0.08)
+                    VariableBlurView(intensity: isScrolled ? 0.032 : 0)
                     LinearGradient(
                         stops: [
                             .init(color: .white.opacity(1.0), location: 0),
@@ -130,23 +140,16 @@ struct FolderDetailView: View {
                         startPoint: .top,
                         endPoint: .bottom
                     )
+                    .opacity(isScrolled ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.2), value: isScrolled)
                 }
-                .opacity(isScrolled ? 1 : 0)
                 .ignoresSafeArea()
-                .animation(.easeInOut(duration: 0.2), value: isScrolled)
             }
         }
         .ignoresSafeArea()
         .ignoresSafeArea(.keyboard)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 20, coordinateSpace: .local)
-                .onEnded { value in
-                    guard value.translation.width > 80,
-                          abs(value.translation.height) < abs(value.translation.width)
-                    else { return }
-                    onDismiss()
-                }
-        )
+        .background(BackSwipeEnabler())
+        .onDisappear { selectedItem = nil }
         .sheet(item: $selectedItem) { item in
             ItemDetailView(item: item, onDelete: {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -161,7 +164,7 @@ struct FolderDetailView: View {
             TextField("Name", text: $editName)
             Button("Delete", role: .destructive) {
                 modelContext.delete(folder)
-                onDismiss()
+                dismiss()
             }
             Button("Save") {
                 let trimmed = editName.trimmingCharacters(in: .whitespaces)
@@ -180,7 +183,7 @@ struct FolderDetailView_Previews: PreviewProvider {
         let container = try! ModelContainer(for: schema, configurations: config)
         let folder = Folder(name: "Test Folder")
         container.mainContext.insert(folder)
-        return FolderDetailView(folder: folder, onDismiss: {})
+        return FolderDetailView(folder: folder)
             .modelContainer(container)
     }
 }

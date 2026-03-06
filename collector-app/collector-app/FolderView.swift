@@ -8,7 +8,7 @@ struct VariableBlurView: UIViewRepresentable {
 
     class BlurView: UIVisualEffectView {
         var animator: UIViewPropertyAnimator?
-        private var lastIntensity: Double = -1
+        var lastIntensity: Double = -1
 
         init() {
             super.init(effect: nil)
@@ -16,23 +16,65 @@ struct VariableBlurView: UIViewRepresentable {
         }
         required init?(coder: NSCoder) { fatalError() }
 
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            guard window != nil else { return }
+            guard lastIntensity >= 0 else { return }
+            let v = lastIntensity
+            lastIntensity = -1
+            DispatchQueue.main.async { [weak self] in
+                self?.setIntensity(v)
+            }
+        }
+
         func setIntensity(_ value: Double) {
+            guard abs(value - lastIntensity) > 0.001 else { return }
             animator?.stopAnimation(true)
+            animator = nil
             effect = nil
             lastIntensity = value
-
+            guard value > 0 else { return }
             let anim = UIViewPropertyAnimator(duration: 1, curve: .linear) { [weak self] in
                 self?.effect = UIBlurEffect(style: .systemUltraThinMaterial)
             }
             anim.startAnimation()
             anim.pauseAnimation()
-            anim.fractionComplete = value
+            anim.fractionComplete = CGFloat(value)
             animator = anim
+            // После навигационных анимаций fractionComplete может сброситься —
+            // проверяем в 3 контрольных точках
+            scheduleStabilization()
+        }
+
+        private func scheduleStabilization() {
+            let target = lastIntensity
+            for delay in [0.3, 0.6, 1.0] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    self?.fixIfNeeded(target: target)
+                }
+            }
+        }
+
+        private func fixIfNeeded(target: Double) {
+            guard window != nil, target > 0 else { return }
+            guard let a = animator, Double(a.fractionComplete) > target + 0.05 else { return }
+            lastIntensity = -1
+            setIntensity(target)
         }
     }
 
     func makeUIView(context: Context) -> BlurView { BlurView() }
-    func updateUIView(_ view: BlurView, context: Context) { view.setIntensity(intensity) }
+    func updateUIView(_ view: BlurView, context: Context) {
+        // Выносим за пределы CATransaction SwiftUI — иначе animator
+        // запускается внутри SwiftUI-транзакции и добегает до fractionComplete=1.0
+        let target = intensity
+        DispatchQueue.main.async { [weak view] in
+            guard let view else { return }
+            let actual = Double(view.animator?.fractionComplete ?? 0)
+            if actual > target + 0.05 && target < 0.99 { view.lastIntensity = -1 }
+            view.setIntensity(target)
+        }
+    }
     static func dismantleUIView(_ uiView: BlurView, coordinator: ()) {
         uiView.animator?.stopAnimation(true)
         uiView.animator = nil
@@ -116,7 +158,7 @@ struct FolderView: View {
                 FolderShape()
                     .fill(Color(red: 106/255, green: 106/255, blue: 106/255, opacity: fillOpacity))
                     .background(
-                        VariableBlurView(intensity: 0.2)
+                        VariableBlurView(intensity: 0.1)
                             .clipShape(FolderShape())
                     )
                     .overlay(
@@ -135,7 +177,7 @@ struct FolderView: View {
                     )
                     .frame(width: 160, height: 130)
             }
-            .frame(width: 160, height: 130)
+            .frame(width: 160, height: 175)
             .id(name)
 
             Text(name)

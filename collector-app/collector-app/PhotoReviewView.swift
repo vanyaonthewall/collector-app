@@ -196,7 +196,7 @@ struct PhotoReviewView: View {
                             .padding(.vertical, 20)
                             .background(
                                 ZStack {
-                                    VariableBlurView(intensity: 0.08)
+                                    VariableBlurView(intensity: 0.1)
                                     RoundedRectangle(cornerRadius: 8)
                                         .fill(Color(red: 54/255, green: 54/255, blue: 54/255))
                                         .opacity(canSave ? 1.0 : 0.0)
